@@ -1,0 +1,5 @@
+#+title: Advent of Code 2023
+
+My solutions for the [[http://adventofcode.com/2023][Advent of Code 2023]]. Each day is seperated into a folder, and each day has a readme with the problem statement and my solution.
+
+If you are using nix, I am keeping a [[file:flake.nix][flake.nix]] file in the root of the repo. You can use it to set up dependecies for running any of the solutions here. There is also an [[file:.envrc][envrc file]] that you can use with direnv to automatically set up the environment when you enter the directory.

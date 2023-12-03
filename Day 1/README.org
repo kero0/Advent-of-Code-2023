@@ -1,0 +1,119 @@
+#+title: AoC 2023 - Day 1
+#+author: Kirols Bakheat
+#+PROPERTY: header-args:sh :cache no :session none
+
+* Part 1
+** Problem
+*** Parse
+1. Split input into strings on newline
+2. Scan string beginning to end
+3. If a digit is encountered then it either becomes ~x~ if it's the first encountered digit or ~y~ otherwise
+4. Convert to int using the formula =10x + y= if ~y~ exists, otherwise ~11x~
+*** Solve
+1. Sum all elements
+** Solution
+#+BEGIN_SRC haskell :tangle Part1.hs
+import Data.Char (digitToInt, isDigit)
+
+parse :: FilePath -> IO [Int]
+parse = fmap (map (f Nothing Nothing) . lines) . readFile
+  where
+    f :: Maybe Int -> Maybe Int -> String -> Int
+    f x y (c : cs)
+      | isDigit c = case x of
+          Nothing -> f (Just $ digitToInt c) y cs
+          Just _ -> f x (Just $ digitToInt c) cs
+      | otherwise = f x y cs
+    f (Just x) (Just y) [] = x * 10 + y
+    f (Just x) Nothing [] = x * 11
+    f _ _ [] = undefined
+
+solve :: [Int] -> Int
+solve = sum
+
+main :: IO ()
+main = do
+  txt <- parse "data.txt"
+  print $ solve txt
+#+END_SRC
+
+** Results
+#+begin_src sh
+runghc Part1.hs
+#+end_src
+
+#+RESULTS[5da09f5286768ff79e5b7d28d7a6a06840b43e58]:
+: 54304
+
+* Part 2
+** Problem
+*** Parse
+1. Split input into strings on newline
+2. Scan string beginning to end
+   1. If a digit is encountered then it either becomes ~x~ if it's the first encountered digit or ~y~ otherwise
+   2. If a the current string is prefixed by a number string, then that number becomes ~x~ if it's the first encountered number or ~y~ otherwise
+3. Convert to int using the formula =10x + y= if ~y~ exists, otherwise ~11x~
+*** Solve
+1. Sum all elements
+** Solution
+#+BEGIN_SRC haskell :tangle Part2.hs
+import Control.Applicative (Alternative ((<|>)))
+import Data.Bifunctor (bimap)
+import Data.Char (digitToInt, isDigit)
+import Data.List.Extra (isPrefixOf)
+import Data.Maybe (fromJust, isJust)
+
+replacements =
+  [ ("one", 1),
+    ("two", 2),
+    ("three", 3),
+    ("four", 4),
+    ("five", 5),
+    ("six", 6),
+    ("seven", 7),
+    ("eight", 8),
+    ("nine", 9),
+    ("zero", 0)
+  ]
+
+parse :: FilePath -> IO [Int]
+parse = fmap (map (f Nothing Nothing) . lines) . readFile
+  where
+    f :: Maybe Int -> Maybe Int -> String -> Int
+    f x y s@(c : cs)
+      | isDigit c = case x of
+          Nothing -> f (Just $ digitToInt c) y cs
+          Just _ -> f x (Just $ digitToInt c) cs
+      | isJust match =
+          case x of
+            Nothing -> f v y cs
+            Just _ -> f x v cs
+      | otherwise = f x y cs
+      where
+        match = foldl1 (<|>) $
+          flip map replacements $
+            \(o, r) ->
+              if o `isPrefixOf` s
+                then Just (o, r)
+                else Nothing
+        (l, v) = bimap length Just $ fromJust match
+    f (Just x) (Just y) [] = x * 10 + y
+    f (Just x) Nothing [] = x * 11
+    f _ _ [] = undefined
+
+solve :: [Int] -> Int
+solve = sum
+
+main :: IO ()
+main = do
+  txt <- parse "data.txt"
+  print $ solve txt
+#+END_SRC
+
+** Results
+#+BEGIN_SRC sh
+runghc Part2.hs
+#+END_SRC
+
+#+RESULTS[a8401b6fa106d729cfb9f901c651aae2ec295828]:
+: 54418

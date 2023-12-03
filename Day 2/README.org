@@ -1,0 +1,214 @@
+#+title: AoC 2023 - Day 2
+#+author: Kirols Bakheat
+#+PROPERTY: header-args:sh :cache no :session none
+
+* Part 1
+** Problem
+*** Parse
+1. Split input into strings on newline
+2. Scan string beginning to end
+   1. String begins with =Game= then the id
+   2. Then there is a list of numbers followed by one of =red=, =green=, =blue=
+      1. This list is seperated by either of =;= or =,= and *it doesn't matter which is used*
+*** Solve
+1. Simplify the bag by taking the max of each of ~Red x~, ~Green x~,  ~Blue x~
+2. Filter only the legal bags, where each ~x~ is lower than it's corresponding limit
+3. Sum over the ids
+** Solution
+#+BEGIN_SRC haskell :tangle Part1.hs
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+import Control.Lens
+import Data.Data (Data, toConstr)
+import Data.Either (fromRight)
+import Data.Function (on)
+import Data.List (groupBy, sortOn)
+import Data.Typeable (Typeable)
+import Text.Parsec
+import Text.Parsec.Token
+
+data Color where
+  Red :: Int -> Color
+  Blue :: Int -> Color
+  Green :: Int -> Color
+  deriving (Data, Typeable, Eq, Ord, Show)
+
+data Bag where
+  Bag :: [Color] -> Bag
+  deriving (Data, Typeable, Eq, Ord, Show)
+
+data Game where
+  Game :: {_gid :: Int, _bag :: Bag} -> Game
+  deriving (Show)
+
+makeLenses ''Game
+
+limit = [Red 12, Green 13, Blue 14]
+
+isValid :: [Color] -> Bool
+isValid bag = all valid limit
+  where
+    valid lim = (<= lim) $ head $ filter (\x -> toConstr x == toConstr lim) bag
+
+simplifyBag :: Bag -> Bag
+simplifyBag (Bag colors) = Bag $ map maximum $ groupBy ((==) `on` toConstr) $ sortOn f colors
+  where
+    f (Red _) = 0
+    f (Green _) = 1
+    f (Blue _) = 2
+
+parser :: Monad m => ParsecT String u m Game
+parser = do
+  string "Game "
+  gid <- read <$> many1 digit
+  string ": "
+  bag <- Bag <$> colors `sepBy` (string ", " <|> string "; ")
+  return $ Game {_gid = gid, _bag = bag}
+  where
+    colors = do
+      count <- read <$> many1 digit
+      spaces
+      color <- many1 letter
+      let c = case color of
+            "red" -> Red
+            "blue" -> Blue
+            "green" -> Green
+            _ -> undefined
+      return $ c count
+
+mparse :: FilePath -> IO [Game]
+mparse f = map (fromRight . parse parser "") . lines <$> readFile f
+  where
+    fromRight (Right r) = r
+    fromRight (Left l) = undefined
+
+solve :: [Game] -> Int
+solve =
+  sum
+    . fmap (^. gid)
+    . filter ((\(Bag b) -> isValid b) . (^. bag))
+    . map (\x -> x & bag %~ simplifyBag)
+
+main :: IO ()
+main = do
+  dat <- mparse "data.txt"
+  print $ solve dat
+#+END_SRC
+
+** Results
+#+begin_src sh
+runghc Part1.hs
+#+end_src
+
+#+RESULTS:
+: 2101
+
+* Part 2
+** Problem
+*** Parse
+See above
+*** Solve
+1. Simplify the bag by taking the max of each of ~Red x~, ~Green x~,  ~Blue x~
+2. Map each game to it's power
+3. Sum the powers
+** Solution
+#+BEGIN_SRC haskell :tangle Part2.hs
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+import Control.Lens
+import Data.Data (Data, toConstr)
+import Data.Either (fromRight)
+import Data.Function (on)
+import Data.List (groupBy, sortOn)
+import Data.Typeable (Typeable)
+import Text.Parsec
+import Text.Parsec.Token
+
+data Color where
+  Red :: Int -> Color
+  Blue :: Int -> Color
+  Green :: Int -> Color
+  deriving (Data, Typeable, Eq, Ord, Show)
+
+data Bag where
+  Bag :: [Color] -> Bag
+  deriving (Data, Typeable, Eq, Ord, Show)
+
+data Game where
+  Game :: {_gid :: Int, _bag :: Bag} -> Game
+  deriving (Show)
+
+makeLenses ''Game
+
+limit = [Red 12, Green 13, Blue 14]
+
+isValid :: [Color] -> Bool
+isValid bag = all valid limit
+  where
+    valid lim = (<= lim) $ head $ filter (\x -> toConstr x == toConstr lim) bag
+
+simplifyBag :: Bag -> Bag
+simplifyBag (Bag colors) = Bag $ map maximum $ groupBy ((==) `on` toConstr) $ sortOn f colors
+  where
+    f (Red _) = 0
+    f (Green _) = 1
+    f (Blue _) = 2
+
+parser :: Monad m => ParsecT String u m Game
+parser = do
+  string "Game "
+  gid <- read <$> many1 digit
+  string ": "
+  bag <- Bag <$> colors `sepBy` (string ", " <|> string "; ")
+  return $ Game {_gid = gid, _bag = bag}
+  where
+    colors = do
+      count <- read <$> many1 digit
+      spaces
+      color <- many1 letter
+      let c = case color of
+            "red" -> Red
+            "blue" -> Blue
+            "green" -> Green
+            _ -> undefined
+      return $ c count
+
+mparse :: FilePath -> IO [Game]
+mparse f = map (fromRight . parse parser "") . lines <$> readFile f
+  where
+    fromRight (Right r) = r
+    fromRight (Left l) = undefined
+
+power :: Bag -> Int
+power (Bag colors) = product $ map unwrap colors
+  where
+    unwrap (Red x) = x
+    unwrap (Green x) = x
+    unwrap (Blue x) = x
+
+solve :: [Game] -> Int
+solve =
+  sum
+    . map
+      ( power
+          . (^. bag)
+          . (\x -> x & bag %~ simplifyBag)
+      )
+
+main :: IO ()
+main = do
+  dat <- mparse "data.txt"
+  print $ solve dat
+#+END_SRC
+
+** Results
+#+BEGIN_SRC sh
+runghc Part2.hs
+#+END_SRC
+
+#+RESULTS[a8401b6fa106d729cfb9f901c651aae2ec295828]:
+: 58269
