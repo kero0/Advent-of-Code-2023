@@ -1,0 +1,137 @@
+#+title: AoC 2023 - Day 3
+#+author: Kirols Bakheat
+#+PROPERTY: header-args:sh :cache no :session none
+
+* Part 1
+** Problem
+*** Parse
+1. Enumerate every row and column of the input
+2. Iterate by character and save it, with its index, to symbols if it's not a ='.'= or digit
+3. If a character is a digit, then we scan for more digits and save the number, with a beginning and end index, to numbers
+*** Solve
+1. Filter any numbers that aren't touching a symbol
+2. Sum over the values
+** Solution
+#+BEGIN_SRC haskell :tangle Part1.hs
+import Control.Lens
+import Data.Char (isDigit)
+
+type Idx = (Int, Int)
+
+data Number = Number {value :: Int, beg :: Idx, end :: Idx}
+  deriving (Show)
+
+newtype Symbol = Symbol {idx :: Idx}
+  deriving (Show)
+
+enumerate :: [a] -> [(Int, a)]
+enumerate = zip [1 ..]
+
+parse :: FilePath -> IO ([Number], [Symbol])
+parse fp = foldl f ([], []) . enumerate . map enumerate . lines <$> readFile fp
+  where
+    f :: ([Number], [Symbol]) -> (Int, [(Int, Char)]) -> ([Number], [Symbol])
+    f state (y, s@((x, c) : cs))
+      | isDigit c =
+          let (val, rest) = span (isDigit . snd) s
+           in flip f (y, rest) $ over _1 (cons Number {value = read $ map snd $ val, beg = (x, y), end = (fst (last val), y)}) state
+      | c == '.' = f state (y, cs)
+      | otherwise =
+          flip f (y, cs) $  over _2 (cons (Symbol {idx = (x, y)})) state
+    f state (_, []) = state
+
+solve :: [Symbol] -> [Number] -> Int
+solve syms nums =
+  sum $
+    map value $
+      filter (flip any syms . isTouching) nums
+  where
+    isTouching num sym =
+      let (ix, iy) = idx sym
+          ((bx, by), (ex, ey)) = (beg num, end num)
+       in ix >= (bx - 1)
+            && iy >= (by - 1)
+            && ix <= (ex + 1)
+            && iy <= (ey + 1)
+
+main :: IO ()
+main = do
+  (nums, syms) <- parse "data.txt"
+  print $ solve syms nums
+#+END_SRC
+
+** Results
+#+begin_src sh
+runghc Part1.hs
+#+end_src
+
+#+RESULTS:
+: 540212
+
+* Part 2
+** Problem
+*** Parse
+Same as above, but we don't bother saving symbols that aren't ~'\*'~
+*** Solve
+1. Map each symbol to the list of numbers touching it
+2. Keep only lists of length 2
+3. Take the product of the values of each list
+4. Sum
+** Solution
+#+BEGIN_SRC haskell :tangle Part2.hs
+import Control.Lens
+import Data.Char (isDigit)
+
+type Idx = (Int, Int)
+
+data Number = Number {value :: Int, beg :: Idx, end :: Idx}
+  deriving (Show)
+
+newtype Symbol = Symbol {idx :: Idx}
+  deriving (Show)
+
+enumerate :: [a] -> [(Int, a)]
+enumerate = zip [1 ..]
+
+parse :: FilePath -> IO ([Number], [Symbol])
+parse fp = foldl f ([], []) . enumerate . map enumerate . lines <$> readFile fp
+  where
+    f :: ([Number], [Symbol]) -> (Int, [(Int, Char)]) -> ([Number], [Symbol])
+    f state (y, s@((x, c) : cs))
+      | isDigit c =
+          let (val, rest) = span (isDigit . snd) s
+           in flip f (y, rest) $ over _1 (cons Number {value = read $ map snd $ val, beg = (x, y), end = (fst (last val), y)}) state
+      | c /= '*' = f state (y, cs)
+      | otherwise =
+          flip f (y, cs) $  over _2 (cons (Symbol {idx = (x, y)})) state
+    f state (_, []) = state
+
+solve :: [Symbol] -> [Number] -> Int
+solve syms nums =
+  sum $
+  map (product .  map value) $
+  filter ((==2) . length) $
+  map touching syms
+  where
+    touching sym = filter (`isTouching` sym) nums
+    isTouching num sym =
+      let (ix, iy) = idx sym
+          ((bx, by), (ex, ey)) = (beg num, end num)
+       in ix >= (bx - 1)
+            && iy >= (by - 1)
+            && ix <= (ex + 1)
+            && iy <= (ey + 1)
+
+main :: IO ()
+main = do
+  (nums, syms) <- parse "data.txt"
+  print $ solve syms nums
+#+END_SRC
+
+** Results
+#+BEGIN_SRC sh
+runghc Part2.hs
+#+END_SRC
+
+#+RESULTS[a8401b6fa106d729cfb9f901c651aae2ec295828]:
+: 87605697
